@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-->
+<!-- mapper 태그선언 -->
+<!--mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-->
+<!-- 	namespace 속성값으로 [DAO 인터페이스명]이 오며 [DAO 인터페이스] 메소드명과 동일한 id 값을 소유한 태그를 내포고 있다.-->
+<!--*******************************************************-->
+<mapper namespace="com.daum.pro.JoinDAO">
+
+
+	<!--*******************************************************-->
+	<!-- 회사 회원가입 성공행의 갯수 리턴하는 insert 문을 내포한 insert 태그 선언-->
+	<!--*******************************************************-->		
+	<insert id="insertCompany" parameterType="com.daum.pro.JoinListDTO" >
+		insert into company
+		values(
+		    (select nvl(max(company_no),0)+1 from company)
+		    , #{company_name}
+		)
+	</insert>
+	
+	
+	<!--*******************************************************-->
+	<!-- 직원 회원가입 성공행의 갯수 리턴하는 insert 문을 내포한 insert 태그 선언-->
+	<!--*******************************************************-->		
+	<insert id="insertEmployee" parameterType="com.daum.pro.JoinListDTO" >
+		insert into employee(
+			emp_no
+			, emp_name
+			, jikup
+			, emp_id
+			, pwd
+			, company_no
+			, company_emp_no
+		)
+		<foreach item="approvalline" collection="joinList"  index="idx" open="" separator=" union " close="">
+			select
+			   	(select nvl(max(emp_no),0)+1+#{idx} from employee)
+			    , #{approvalline.emp_name}
+			    , #{approvalline.jikup}
+			    , #{approvalline.id}
+			    , #{approvalline.pwd}
+			    , (select nvl(max(company_no),0) from company)
+			    , (select nvl(max(company_emp_no),0)+1+#{idx} from employee  where company_no = (select nvl(max(company_no),0) from company))
+		     from dual
+		</foreach>
+	</insert>
+	
+	
+	<!--*******************************************************-->
+	<!-- 보고서 결재 종류 리턴하는 insert 문을 내포한 insert 태그 선언-->
+	<!--*******************************************************-->	
+	<insert id="insertReport_fieldList" parameterType="com.daum.pro.JoinListDTO" >
+		insert into company_report(
+			company_re_no
+			, company_no
+			, report_code
+		)
+		<foreach item="report_field_code" collection="report_field" index="idx" open="" separator=" union " close="">
+			 select 
+			 		(select nvl(max(company_re_no),0)+1+#{idx} from company_report)
+					 , (select nvl(max(company_no),0) from company)
+  					 , #{report_field_code}
+			 from dual
+		</foreach>
+	</insert>
+	
+	
+	<!--*******************************************************-->
+	<!-- 보고서 결재 종류 리턴하는 insert 문을 내포한 insert 태그 선언-->
+	<!--*******************************************************-->	
+	<select id="searchemp_id" parameterType="com.daum.pro.JoinListDTO" resultType="int">
+		select
+			count(*)
+		from employee
+		where emp_id in
+		<foreach item="list" collection="joinList" index="idx" separator="," open="(" close=")">
+			 #{list.id} 
+		</foreach>
+	</select>
+	
+	
+</mapper>
+
+
+
+
+

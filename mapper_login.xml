@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-->
+<!-- mapper 태그선언 -->
+<!--mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-->
+<!-- 	namespace 속성값으로 [DAO 인터페이스명]이 오며 [DAO 인터페이스] 메소드명과 동일한 id 값을 소유한 태그를 내포고 있다.-->
+<!--*******************************************************-->
+<mapper namespace="com.daum.pro.LoginDAO">
+	<select id="getEmpCnt" parameterType="java.util.HashMap" resultType="String">
+		   select count(*)||"info"  from ( select e.emp_id "id", e.pwd "pwd" ,',e,'||emp_name||','||j.jikup_name||','||c.company_name||','||e.company_emp_no||','||e.emp_no||','||e.company_no "info"
+                        from employee e, code_jikup j, company c  where e.jikup = j.jikup_code and c.company_no = e.company_no
+		   ) where "id"=#{id} and "pwd"=#{pwd}
+		    group by "info"
+	</select>
+</mapper>

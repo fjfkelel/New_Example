@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-->
+<!-- mapper 태그선언 -->
+<!--mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-->
+<!-- 	namespace 속성값으로 [DAO 인터페이스명]이 오며 [DAO 인터페이스] 메소드명과 동일한 id 값을 소유한 태그를 내포고 있다.-->
+<!--*******************************************************-->
+<mapper namespace="com.daum.pro.ExpenseDAO">
+
+
+	<!--*******************************************************-->
+	<!-- 게시판 총 행의 개수 검색하는 select 문을 내포한 select 태그 선언-->
+	<!--*******************************************************-->
+	<select id="getExpenseBoardListCnt" parameterType="com.daum.pro.ExpenseListDTO" resultType="int">
+			select count(*) from employee e, expense_report er, code_expense_field cef, code_expense_method cem, sign_finish_report sfr, code_sign cs
+			where sfr.report_code = er.report_code and sfr.report_no = er.report_no and sfr.sign_code = cs.sign_code
+				 and er.expense_method = cem.expense_method_code and er.expense_field = cef.expense_field_code and sfr.emp_no = e.emp_no
+				 <![CDATA[ and er.emp_no in(select e.emp_no from employee e where e.company_no = #{company_no} and e.company_emp_no <=#{company_emp_no} ) ]]>
+				 and sfr.emp_no = (select max(sfr2.emp_no) from sign_finish_report sfr2 where sfr2.report_no = er.report_no and sfr2.report_code = er.report_code  )
+	</select>
+	
+	
+	<!--*******************************************************-->
+	<!-- 게시판 목록 검색하는 select 문을 내포한 select 태그 선언-->
+	<!--*******************************************************-->
+	<select id="getExpenseBoardList" parameterType="com.daum.pro.ExpenseListDTO" resultType="java.util.HashMap">	
+		  select
+		     er.report_name "report_name"
+		     ,cef.expense_field_name "expense_field"
+		     ,case when (select count(*) from employee e2 , expense_report er2
+		                where er2.emp_no != #{emp_no} and e2.company_no = #{company_no}  and e2.emp_no = er2.emp_no and e2.emp_no = e.emp_no
+		               <![CDATA[ and (select count(*) from sign_finish_report sfr2 where sfr2.report_no = er2.report_no and sfr2.report_code = er2.report_code and sfr2.sign_code=1 and e2.company_emp_no= #{company_emp_no}-1 ) =1
+		                and (select count(*) from sign_finish_report sfr2 where sfr2.report_no = er2.report_no and sfr2.report_code = er2.report_code and sfr2.sign_code=1 and e2.company_emp_no= #{company_emp_no} ) =0 )  >=1 ]]>
+		    then'미결재' else cs.sign_name end  "sign_name"
+		   
+		     ,sfr.sign_date      "sign_date"
+		     ,er.expense_date   "expense_date"
+		     ,er.expense_price  "expense_price"
+		     ,cem.expense_method_name "expense_method"
+		     ,er.receipt_no     "receipt_no"
+		     ,(select count(*) from sign_finish_report sfr where sfr.report_no = er.report_no and sfr.report_code = er.report_code and sfr.sign_code=1)
+		       ||'/'||
+		       ( (select max(e2.company_emp_no) from employee e2  where e.company_no = e2.company_no)
+		         -(select company_emp_no from employee e where e.emp_no = er.emp_no)+1)  "sign_state"
+		   
+		   
+		    from employee e, expense_report er, code_expense_field cef, code_expense_method cem, sign_finish_report sfr, code_sign cs
+		    where sfr.report_code = er.report_code and sfr.report_no = er.report_no and sfr.sign_code = cs.sign_code
+		    and er.expense_method = cem.expense_method_code and er.expense_field = cef.expense_field_code and sfr.emp_no = e.emp_no
+		    <![CDATA[ and er.emp_no in(select e.emp_no from employee e where e.company_no = #{company_no} and e.company_emp_no <=#{company_emp_no} ) ]]>
+		    and sfr.emp_no = (select max(sfr2.emp_no) from sign_finish_report sfr2 where sfr2.report_no = er.report_no and sfr2.report_code = er.report_code  )
+		        <if test="min_approval_year!=null and min_approval_year!='' and min_approval_month!=null and min_approval_month!='' ">
+		            <![CDATA[ and sfr.sign_date>=to_date('${min_approval_year}-${min_approval_month}','YYYY-MM')  ]]>
+		        </if>
+		        <if test="max_approval_year!=null and max_approval_year!='' and max_approval_month!=null and max_approval_month!='' ">
+		            <![CDATA[  and sfr.sign_date<=last_day(to_date('${max_approval_year}-${max_approval_month}','YYYY-MM') )  ]]>              
+		        </if>
+		           
+		           
+		        <if test="min_expense_year!=null and min_expense_year!='' and min_expense_month!=null and min_expense_month!=''">
+		            <![CDATA[ and er.expense_date>=to_date('${min_expense_year}-${min_expense_month}','YYYY-MM')  ]]>
+		        </if>
+		        <if test="max_expense_year!=null and max_expense_year!='' and max_expense_month!=null and max_expense_month!='' ">
+		            <![CDATA[  and sfr.sign_date<=last_day(to_date('${max_expense_year}-${max_expense_month}','YYYY-MM') )  ]]>
+		        </if>                                   
+		
+		        <if test="expense_means!=null and expense_means.size()>0 ">
+		            and er.expense_method in
+		                <foreach item="expense_means" collection="expense_means" index="index" open="(" separator="," close=")" >
+		                    #{expense_means}
+		                </foreach>
+		        </if>
+		
+		        <if test="expense_area!=null and expense_area.size()>0 ">
+		            and er.expense_field in
+		                <foreach item="expense_area" collection="expense_area" index="index" open="(" separator="," close=")" >
+		                    #{expense_area}
+		                </foreach>
+		        </if>
+		
+				<if test="cost_min!=null and cost_min!=''">
+		      	  <![CDATA[ and er.expense_price >= to_number(#{cost_min}||'0000') ]]>
+		        </if>
+		        
+   				<if test="cost_max!=null and cost_max!=''">
+		     	   <![CDATA[ and er.expense_price <= to_number(#{cost_max}||'0000') ]]>
+		        </if>
+		
+		        <if test=" keyword1!=null and keyword1!='' ">
+		            and (    
+		                    (
+		                     upper(er.report_name) like upper('%${keyword1}%')
+		                     or er.expense_field = any (
+		                           select expense_field_code from code_expense_field
+		                           where expense_field_code = any(select expense_field_code from code_expense_field
+		                                                            where upper(expense_field_name) like upper('%${keyword1}%')
+		                                                        )
+		                     )
+		                     or er.expense_method = any (
+		                           select expense_method_code from code_expense_method
+		                           where expense_method_code = any(select expense_method_code from code_expense_method
+		                                                            where upper(expense_method_name) like upper('%${keyword1}%')
+		                                                        )
+		                     )
+		                     or to_char(sfr.sign_date,'yyyy') like '%${keyword1}%'
+		                     or to_char(sfr.sign_date,'mm') like '%${keyword1}%'
+		                     or to_char(sfr.sign_date,'dd') like '%${keyword1}%'
+		                     or to_char(er.expense_date,'yyyy') like '%${keyword1}%'
+		                     or to_char(er.expense_date,'mm') like '%${keyword1}%'
+		                     or to_char(er.expense_date,'dd') like '%${keyword1}%'
+		                     or to_char(er.expense_price) like '%${keyword1}%'
+		                     or er.receipt_no like '%${keyword1}%'
+		                    )
+		                     
+		                     <if test="keyword2!=null and keyword2!='' ">
+		                          <if test="or_and == 1">
+		                             or
+		                          </if>
+		                          <if test="or_and == 2">
+		                             and
+		                          </if>
+		
+		                     (
+		                     upper(er.report_name) like upper('%${keyword2}%')
+		                           or er.expense_field = any (
+		                                     select expense_field_code from code_expense_field
+		                                     where expense_field_code = any(select expense_field_code from code_expense_field
+		                                                                      where upper(expense_field_name) like upper('%${keyword2}%')
+		                                                                  )
+		                               )
+		                               or er.expense_method = any (
+		                                     select expense_method_code from code_expense_method
+		                                     where expense_method_code = any(select expense_method_code from code_expense_method
+		                                                                      where upper(expense_method_name) like upper('%${keyword2}%')
+		                                                                  )
+		                               )
+		                              or to_char(sfr.sign_date,'yyyy') like '%${keyword2}%'
+				                     or to_char(sfr.sign_date,'mm') like '%${keyword2}%'
+				                     or to_char(sfr.sign_date,'dd') like '%${keyword2}%'
+				                     or to_char(er.expense_date,'yyyy') like '%${keyword2}%'
+				                     or to_char(er.expense_date,'mm') like '%${keyword2}%'
+				                     or to_char(er.expense_date,'dd') like '%${keyword2}%'
+				                     or to_char(er.expense_price) like '%${keyword2}%'
+				                     or er.receipt_no like '%${keyword2}%'
+		                      )
+	                    )
+		
+		              </if>   
+		            </if>
+	</select>
+	
+	
+
+	<!--*******************************************************-->
+	<!-- 게시판에서 보고서 등록하는 insert문을 내포한 insert태그 선언 -->
+	<!--*******************************************************-->
+	<insert id="insertExpense_report"  parameterType="com.daum.pro.ExpenseDTO" >
+			 insert into expense_report(
+			 	report_no
+			 	, report_code
+			 	,report_name
+			 	,expense_field
+			 	,expense_price
+			 	,expense_method
+			 	,expense_date
+			 	,receipt_no
+			 	,remarks
+			 	,emp_no
+			 )
+			  values( 
+			 	  (select nvl(max(report_no),0)+1 from expense_report)
+                  ,1
+                  ,#{expense_name}
+                  ,#{expense_field}
+                  ,to_number(replace(#{expense_price}, ','))
+                  ,#{expense_method}
+                  ,to_date(#{expense_year}||#{expense_month}||#{expense_date}, 'yyyymmdd')
+                  ,#{receipt_no}
+                  ,#{remarks}
+                  ,#{emp_no}
+ 			)    
+	</insert>
+	
+	<!--*******************************************************-->
+	<!-- 게시판에서 보고서 등록하는 insert문을 내포한 insert태그 선언 -->
+	<!--*******************************************************-->
+	<insert id="insertSign_report"  parameterType="com.daum.pro.ExpenseDTO" >
+			 insert into sign_finish_report(
+			 	sign_finish_no
+			 	, emp_no
+			 	, report_code
+			 	, report_no
+			 	, sign_date
+			 	, sign_code
+			 )
+			  values( 
+		 		(select nvl(max(sign_finish_no),0)+1 from sign_finish_report)  
+                 ,#{emp_no}
+                 ,1
+                 ,(select nvl(max(report_no),0) from expense_report)
+                 ,sysdate
+                 ,1
+			 ) 
+
+	</insert>
+	
+</mapper>
+
+
+
+
+
